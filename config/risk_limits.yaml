@@ -1,0 +1,39 @@
+# Safety rules — edit only by hand, never by the AI or the learning system.
+# Corresponds to CLAUDE.md rules 1-17.
+
+max_risk_per_trade: 0.01        # rule 4: 1% of equity
+max_position_size: 0.15         # rule 4: 15% of equity
+max_sector_exposure: 0.30       # rule 4: 30% of equity
+min_cash_ratio: 0.10            # rule 4: keep 10% cash minimum
+max_positions: 8                # rule 4: max open positions
+
+max_portfolio_heat: 0.05        # rule 5: 5% total risk-to-stop
+max_cluster_heat: 0.02          # rule 5: 2% for correlated cluster
+cluster_correlation_threshold: 0.80  # rule 5: 60-day return correlation
+
+max_cost_per_r: 0.15            # rule 7: skip if round-trip cost > 0.15R
+min_reward_risk: 2.0            # rule 7: reward:risk must be >= 2:1
+
+daily_loss_limit: 0.02          # rule 9: no new buys after 2% daily loss
+weekly_drawdown_circuit: 0.05   # rule 9: 5% from weekly peak
+peak_drawdown_circuit: 0.10     # rule 9: 10% from all-time peak
+
+max_slippage: 0.003             # rule 11: 0.3% max slippage on limit orders
+
+monthly_ai_budget_gbp: 50.0     # rule 17: stop API calls at this spend
+
+regime:
+  elevated_vol_percentile: 60   # above this → multiplier 0.5×
+  stressed_vol_percentile: 80   # above this → multiplier 0 (no new buys)
+
+costs:
+  commission_per_trade: 1.00    # GBP per side — verify against IB schedule
+  uk_stamp_duty: 0.005          # 0.5% on UK share purchases; ETFs exempt
+  default_spread_estimate: 0.001
+  slippage_per_side: 0.001
+  paper_slippage_haircut: 0.001  # extra per side added to paper stats
+
+liquidity:
+  min_avg_volume: 100000
+  min_price: 0.50               # GBP
+  max_spread_pct: 0.003         # 0.3%

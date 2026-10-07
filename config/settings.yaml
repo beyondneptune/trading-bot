@@ -1,0 +1,19 @@
+env: paper
+mock_mode: true          # safe default; launch live with TRADING_MOCK=false
+phase: 6                 # current build phase
+autonomous: false        # safe default
+trading_backend: none    # L0: IB trading switched OFF (code kept). "alpaca" from L1.
+
+ib:
+  host: "127.0.0.1"
+  tws_port: 7497
+  gateway_port: 4002
+  client_id: 1
+  readonly: true   # IB trading is off in the lab; keep read-only
+
+database:
+  path: "lab_mock.db"    # mock mode uses a *mock* DB; paper uses lab_paper.db (rule: one DB per mode)
+
+logging:
+  level: "INFO"
+  file: "logs/trading_bot.log"

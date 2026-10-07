@@ -1,0 +1,201 @@
+# Starter watchlist.  IB contract details (currency, exchange, min_tick,
+# price_magnifier) are resolved and stored in the database at startup.
+# price_unit: GBX = pence (LSE shares), GBP = pounds (ETFs on LSE), USD = dollars
+
+etfs:
+  - symbol: CSPX    # S&P 500 UCITS — iShares Core
+    exchange: LSE
+    currency: USD
+    price_unit: USD
+    sector: equity_us
+
+  - symbol: VUSA    # S&P 500 UCITS — Vanguard
+    exchange: LSE
+    currency: USD
+    price_unit: USD
+    sector: equity_us
+
+  - symbol: EQQQ    # Nasdaq 100 UCITS — Invesco
+    exchange: LSE
+    currency: USD
+    price_unit: USD
+    sector: equity_us
+
+  - symbol: VWRL    # All-World UCITS — Vanguard
+    exchange: LSE
+    currency: USD
+    price_unit: USD
+    sector: equity_global
+
+  - symbol: ISF     # FTSE 100 UCITS — iShares
+    exchange: LSE
+    currency: GBP
+    price_unit: GBP
+    sector: equity_uk
+
+  - symbol: IGLT    # UK Gilts UCITS — iShares
+    exchange: LSE
+    currency: GBP
+    price_unit: GBP
+    sector: bonds_uk
+
+  - symbol: SGLN    # Gold ETC — Invesco
+    exchange: LSE
+    currency: USD
+    price_unit: USD
+    sector: commodities
+
+stocks:
+  # FTSE 100
+  - symbol: AZN     # AstraZeneca
+    exchange: LSE
+    currency: GBP
+    price_unit: GBX   # pence
+    sector: healthcare
+
+  - symbol: SHEL    # Shell
+    exchange: LSE
+    currency: GBP
+    price_unit: GBX
+    sector: energy
+
+  - symbol: HSBA    # HSBC
+    exchange: LSE
+    currency: GBP
+    price_unit: GBX
+    sector: financials
+
+  - symbol: BP      # BP
+    exchange: LSE
+    currency: GBP
+    price_unit: GBX
+    sector: energy
+
+  - symbol: LSEG    # London Stock Exchange Group
+    exchange: LSE
+    currency: GBP
+    price_unit: GBX
+    sector: financials
+
+  - symbol: RIO     # Rio Tinto
+    exchange: LSE
+    currency: GBP
+    price_unit: GBX
+    sector: materials
+
+  - symbol: ULVR    # Unilever
+    exchange: LSE
+    currency: GBP
+    price_unit: GBX
+    sector: consumer_staples
+
+  - symbol: GSK     # GSK
+    exchange: LSE
+    currency: GBP
+    price_unit: GBX
+    sector: healthcare
+
+  # US large-caps (S&P 500)
+  - symbol: AAPL
+    exchange: NASDAQ
+    currency: USD
+    price_unit: USD
+    sector: technology
+
+  - symbol: MSFT
+    exchange: NASDAQ
+    currency: USD
+    price_unit: USD
+    sector: technology
+
+  - symbol: GOOGL
+    exchange: NASDAQ
+    currency: USD
+    price_unit: USD
+    sector: technology
+
+  - symbol: AMZN
+    exchange: NASDAQ
+    currency: USD
+    price_unit: USD
+    sector: consumer_discretionary
+
+  - symbol: NVDA
+    exchange: NASDAQ
+    currency: USD
+    price_unit: USD
+    sector: technology
+
+  - symbol: JPM
+    exchange: NYSE
+    currency: USD
+    price_unit: USD
+    sector: financials
+
+  - symbol: XOM
+    exchange: NYSE
+    currency: USD
+    price_unit: USD
+    sector: energy
+
+  - symbol: JNJ
+    exchange: NYSE
+    currency: USD
+    price_unit: USD
+    sector: healthcare
+
+  # Extended US large-caps (aggressive mode — more opportunities, no stamp duty)
+  - {symbol: TSLA, exchange: NASDAQ, currency: USD, price_unit: USD, sector: consumer_discretionary}
+  - {symbol: META, exchange: NASDAQ, currency: USD, price_unit: USD, sector: technology}
+  - {symbol: AMD,  exchange: NASDAQ, currency: USD, price_unit: USD, sector: technology}
+  - {symbol: NFLX, exchange: NASDAQ, currency: USD, price_unit: USD, sector: communications}
+  - {symbol: INTC, exchange: NASDAQ, currency: USD, price_unit: USD, sector: technology}
+  - {symbol: CSCO, exchange: NASDAQ, currency: USD, price_unit: USD, sector: technology}
+  - {symbol: PEP,  exchange: NASDAQ, currency: USD, price_unit: USD, sector: consumer_staples}
+  - {symbol: COST, exchange: NASDAQ, currency: USD, price_unit: USD, sector: consumer_staples}
+  - {symbol: ADBE, exchange: NASDAQ, currency: USD, price_unit: USD, sector: technology}
+  - {symbol: QCOM, exchange: NASDAQ, currency: USD, price_unit: USD, sector: technology}
+  - {symbol: AVGO, exchange: NASDAQ, currency: USD, price_unit: USD, sector: technology}
+  - {symbol: V,    exchange: NYSE,   currency: USD, price_unit: USD, sector: financials}
+  - {symbol: MA,   exchange: NYSE,   currency: USD, price_unit: USD, sector: financials}
+  - {symbol: WMT,  exchange: NYSE,   currency: USD, price_unit: USD, sector: consumer_staples}
+  - {symbol: HD,   exchange: NYSE,   currency: USD, price_unit: USD, sector: consumer_discretionary}
+  - {symbol: PG,   exchange: NYSE,   currency: USD, price_unit: USD, sector: consumer_staples}
+  - {symbol: KO,   exchange: NYSE,   currency: USD, price_unit: USD, sector: consumer_staples}
+  - {symbol: DIS,  exchange: NYSE,   currency: USD, price_unit: USD, sector: communications}
+  - {symbol: BA,   exchange: NYSE,   currency: USD, price_unit: USD, sector: industrials}
+  - {symbol: CVX,  exchange: NYSE,   currency: USD, price_unit: USD, sector: energy}
+  - {symbol: UNH,  exchange: NYSE,   currency: USD, price_unit: USD, sector: healthcare}
+  - {symbol: CRM,  exchange: NYSE,   currency: USD, price_unit: USD, sector: technology}
+
+  # Extended UK FTSE names (LSE, pence) — tradeable during UK hours
+  - {symbol: GLEN, exchange: LSE, currency: GBP, price_unit: GBX, sector: materials}
+  - {symbol: BARC, exchange: LSE, currency: GBP, price_unit: GBX, sector: financials}
+  - {symbol: LLOY, exchange: LSE, currency: GBP, price_unit: GBX, sector: financials}
+  - {symbol: NWG,  exchange: LSE, currency: GBP, price_unit: GBX, sector: financials}
+  - {symbol: VOD,  exchange: LSE, currency: GBP, price_unit: GBX, sector: communications}
+  - {symbol: TSCO, exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_staples}
+  - {symbol: SBRY, exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_staples}
+  - {symbol: SSE,  exchange: LSE, currency: GBP, price_unit: GBX, sector: utilities}
+  - {symbol: CNA,  exchange: LSE, currency: GBP, price_unit: GBX, sector: utilities}
+  - {symbol: PRU,  exchange: LSE, currency: GBP, price_unit: GBX, sector: financials}
+  - {symbol: LGEN, exchange: LSE, currency: GBP, price_unit: GBX, sector: financials}
+  - {symbol: STAN, exchange: LSE, currency: GBP, price_unit: GBX, sector: financials}
+  - {symbol: REL,  exchange: LSE, currency: GBP, price_unit: GBX, sector: industrials}
+  - {symbol: RKT,  exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_staples}
+  - {symbol: DGE,  exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_staples}
+  - {symbol: BATS, exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_staples}
+  - {symbol: IMB,  exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_staples}
+  - {symbol: CPG,  exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_staples}
+  - {symbol: NXT,  exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_discretionary}
+  - {symbol: ABF,  exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_staples}
+  - {symbol: SGE,  exchange: LSE, currency: GBP, price_unit: GBX, sector: technology}
+  - {symbol: EXPN, exchange: LSE, currency: GBP, price_unit: GBX, sector: industrials}
+  - {symbol: FLTR, exchange: LSE, currency: GBP, price_unit: GBX, sector: consumer_discretionary}
+  - {symbol: AAL,  exchange: LSE, currency: GBP, price_unit: GBX, sector: materials}
+  - {symbol: ANTO, exchange: LSE, currency: GBP, price_unit: GBX, sector: materials}
+  - {symbol: FRES, exchange: LSE, currency: GBP, price_unit: GBX, sector: materials}
+  - {symbol: III,  exchange: LSE, currency: GBP, price_unit: GBX, sector: financials}
+  - {symbol: SMIN, exchange: LSE, currency: GBP, price_unit: GBX, sector: industrials}
+  - {symbol: WPP,  exchange: LSE, currency: GBP, price_unit: GBX, sector: communications}
+  - {symbol: ITV,  exchange: LSE, currency: GBP, price_unit: GBX, sector: communications}
