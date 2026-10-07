@@ -52,10 +52,60 @@ def check_options_level(conn: sqlite3.Connection, broker: Broker) -> tuple:
 
 
 def kill_switch(broker: Broker) -> int:
-    """Cancel all open orders and return how many were cancelled."""
-    n = broker.cancel_all_orders()
-    logger.warning("KILL SWITCH: cancelled %d open order(s).", n)
+    """Cancel open ENTRY orders only; protective stops are left in place
+    (CLAUDE.md rule 9). Returns how many entries were cancelled."""
+    n = broker.cancel_entry_orders()
+    logger.warning("KILL SWITCH: cancelled %d entry order(s); stops left in place.", n)
     return n
+
+
+def close_position(broker: Broker, symbol: str) -> bool:
+    """Close a long position the SAFE way (rule 6): cancel its protective stop
+    FIRST, then sell at market — so shares can never be sold twice. Returns
+    True if a position was sold."""
+    for o in broker.get_orders(open_only=True):
+        if o.symbol == symbol and o.is_protective_stop:
+            broker.cancel_order(o.id)
+            logger.info("Cancelled protective stop %s for %s before selling.", o.id, symbol)
+    pos = next((p for p in broker.get_positions() if p.symbol == symbol), None)
+    if pos is None or pos.qty == 0:
+        return False
+    broker.submit_order(symbol=symbol, qty=abs(pos.qty), side="sell",
+                        order_type="market", tif="day")
+    logger.info("Sold %s %s.", abs(pos.qty), symbol)
+    return True
+
+
+def cancel_unfilled_entries(broker: Broker) -> int:
+    """Close-of-day task: cancel any still-open GTC entry (buy) orders, so a
+    stale entry can't fill overnight. Same as the kill switch's entry cancel."""
+    return broker.cancel_entry_orders()
+
+
+def ensure_stops(broker: Broker, conn: sqlite3.Connection,
+                 stop_pct: float = 0.03) -> list:
+    """Daily check (rule 6): every long position must have a live protective
+    stop. GTC stops expire after ~90 days, so if one is missing, re-place it
+    (GTC) and ALERT. Returns the symbols whose stops were re-placed."""
+    import datetime
+    stopped = {o.symbol for o in broker.get_orders(open_only=True)
+               if o.is_protective_stop}
+    replaced = []
+    for p in broker.get_positions():
+        if p.qty > 0 and p.symbol not in stopped:
+            stop_price = round(p.avg_entry_price * (1 - stop_pct), 2)
+            broker.submit_order(symbol=p.symbol, qty=abs(p.qty), side="sell",
+                                order_type="stop", stop_price=stop_price, tif="gtc")
+            replaced.append(p.symbol)
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            conn.execute(
+                "INSERT INTO system_events(event_type, note, logged_at) VALUES (?,?,?)",
+                ("ALERT", f"Re-placed missing protective stop for {p.symbol} @ {stop_price}", now),
+            )
+            logger.warning("ALERT: re-placed missing stop for %s @ %s", p.symbol, stop_price)
+    if replaced:
+        conn.commit()
+    return replaced
 
 
 def hard_stop(broker: Broker, on: bool = True) -> None:
@@ -85,13 +135,21 @@ class ReconResult:
 
 
 def reconcile(broker: Broker, conn: sqlite3.Connection) -> ReconResult:
-    """Compare the broker's positions (source of truth) with the database."""
+    """Compare the broker's positions (source of truth) with what the database
+    learned from the trade-update stream: net filled qty per symbol (buys minus
+    sells, using each order's cumulative filled_qty)."""
     broker_pos = {p.symbol: p.qty for p in broker.get_positions()}
     rows = conn.execute(
-        "SELECT symbol, COALESCE(SUM(quantity),0) q FROM positions "
-        "WHERE closed_at IS NULL GROUP BY symbol"
+        """SELECT symbol, side, MAX(COALESCE(filled_qty, 0)) AS filled
+           FROM trade_updates
+           WHERE order_id IS NOT NULL AND symbol IS NOT NULL
+           GROUP BY order_id, symbol, side"""
     ).fetchall()
-    db_pos = {r["symbol"]: float(r["q"]) for r in rows}
+    db_pos: dict = {}
+    for r in rows:
+        signed = float(r["filled"]) * (1.0 if r["side"] == "buy" else -1.0)
+        db_pos[r["symbol"]] = db_pos.get(r["symbol"], 0.0) + signed
+    db_pos = {s: q for s, q in db_pos.items() if abs(q) > 1e-9}
     symbols = set(broker_pos) | set(db_pos)
     mismatches = [
         {"symbol": s, "broker": broker_pos.get(s, 0.0), "db": db_pos.get(s, 0.0)}

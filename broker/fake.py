@@ -66,6 +66,21 @@ class FakeBroker(Broker):
                 n += 1
         return n
 
+    def cancel_order(self, order_id: str) -> None:
+        for o in self._orders:
+            if o.id == order_id and o.status in ("new", "accepted", "held"):
+                o.status = "canceled"
+
+    def cancel_entry_orders(self) -> int:
+        """Cancel open entries (buys) only; leave protective sell-stops."""
+        n = 0
+        for o in self._orders:
+            if o.status in ("new", "accepted", "held") and not o.is_protective_stop:
+                if o.side == "buy":
+                    o.status = "canceled"
+                    n += 1
+        return n
+
     def close_all_positions(self, cancel_orders: bool = True) -> int:
         if cancel_orders:
             self.cancel_all_orders()
@@ -73,18 +88,40 @@ class FakeBroker(Broker):
         self._positions.clear()
         return n
 
-    def submit_order(self, *, symbol, qty, side, asset_class="us_equity", **kwargs):
+    def _next_id(self) -> str:
+        self._oid = getattr(self, "_oid", 0) + 1
+        return f"o{self._oid}"
+
+    def submit_order(self, *, symbol, qty, side, asset_class="us_equity",
+                     order_type="market", limit_price=None, stop_price=None,
+                     order_class=None, tif="gtc", client_order_id=None, **kwargs):
         from broker.base import OptionsNotAllowedError, is_option_symbol
         if asset_class in ("option", "us_option") or is_option_symbol(symbol):
             raise OptionsNotAllowedError(f"Options order blocked: {symbol}")
-        o = BrokerOrder(
-            id=f"o{len(self._orders) + 1}",
-            client_order_id=kwargs.get("client_order_id", "c"),
-            symbol=symbol, qty=qty, side=side,
-            order_type=kwargs.get("order_type", "market"), status="new",
+
+        entry = BrokerOrder(
+            id=self._next_id(), client_order_id=client_order_id or "c",
+            symbol=symbol, qty=qty, side=side, order_type=order_type,
+            status="new", limit_price=limit_price, stop_price=stop_price, tif=tif,
         )
-        self._orders.append(o)
-        return o
+        self._orders.append(entry)
+
+        if side == "buy" and order_type == "market":
+            # simulate an immediate market fill -> open the position
+            entry.status = "filled"
+            self._add_position(symbol, qty, limit_price or (stop_price or 0) or 100.0, "long")
+            if order_class == "oto" and stop_price:
+                # OTO: a protective sell-stop becomes active, inheriting the TIF
+                self._orders.append(BrokerOrder(
+                    id=self._next_id(), client_order_id=(client_order_id or "c") + "-stop",
+                    symbol=symbol, qty=qty, side="sell", order_type="stop",
+                    status="new", stop_price=stop_price, tif=tif,
+                ))
+        elif side == "sell" and order_type == "market":
+            # closing sell: fill and remove the position
+            entry.status = "filled"
+            self._positions = [p for p in self._positions if p.symbol != symbol]
+        return entry
 
     def stream_trade_updates(self, on_update: Callable[[dict], None]) -> None:
         self.updates_cb = on_update

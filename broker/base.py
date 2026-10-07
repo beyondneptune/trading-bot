@@ -74,6 +74,12 @@ class BrokerOrder:
     status: str
     limit_price: Optional[float] = None
     stop_price: Optional[float] = None
+    tif: Optional[str] = None       # "day" / "gtc"
+
+    @property
+    def is_protective_stop(self) -> bool:
+        """A sell stop is a protective stop (we are long-only), never an entry."""
+        return self.side == "sell" and self.order_type in ("stop", "stop_limit")
 
 
 class Broker(ABC):
@@ -116,6 +122,15 @@ class Broker(ABC):
     @abstractmethod
     def close_all_positions(self, cancel_orders: bool = True) -> int:
         """Liquidate every position. Returns how many were closed."""
+
+    @abstractmethod
+    def cancel_order(self, order_id: str) -> None:
+        """Cancel one order by id (used to pull a stop before selling)."""
+
+    @abstractmethod
+    def cancel_entry_orders(self) -> int:
+        """Cancel open ENTRY orders only (buys); leave protective stops in
+        place. Used by the kill switch. Returns how many were cancelled."""
 
     # --- order submission (the single chokepoint; HARD-BLOCKS options) ---
     @abstractmethod

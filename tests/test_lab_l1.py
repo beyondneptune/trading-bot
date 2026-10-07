@@ -76,8 +76,8 @@ class TestReconcile:
         b = FakeBroker()
         b._add_position("SPY", 10, 500.0)
         conn.execute(
-            "INSERT INTO positions (symbol,exchange,quantity,avg_cost,currency,opened_at)"
-            " VALUES ('SPY','ARCA',10,500.0,'USD','2026-01-01T00:00:00+00:00')"
+            "INSERT INTO trade_updates (event, order_id, symbol, side, filled_qty, received_at)"
+            " VALUES ('fill','o1','SPY','buy',10,'2026-01-01T00:00:00+00:00')"
         )
         conn.commit()
         assert reconcile(b, conn).ok is True
@@ -112,8 +112,8 @@ class TestOptionsBlock:
 
     def test_submit_order_allows_equity(self):
         b = FakeBroker()
-        o = b.submit_order(symbol="SPY", qty=1, side="buy")
-        assert o.symbol == "SPY" and o.status == "new"
+        o = b.submit_order(symbol="SPY", qty=1, side="buy")   # not blocked
+        assert o.symbol == "SPY" and o.status == "filled"     # buy-market fills in the fake
 
 
 class TestOptionsLevelMonitor:
@@ -177,6 +177,68 @@ class TestStartupSequence:
         with caplog.at_level(logging.WARNING):
             startup_checks(b, conn, "paper", "lab_paper_test.db")
         assert any("HARD STOP" in r.message for r in caplog.records)
+
+
+class TestOTOAndStops:
+    def _oto_buy(self, b, stop=600.0, tif="gtc"):
+        b.connect()
+        b.submit_order(symbol="SPY", qty=1, side="buy", order_type="market",
+                       order_class="oto", stop_price=stop, tif=tif,
+                       client_order_id="S5-1")
+
+    def test_oto_buy_creates_position_and_gtc_stop(self):
+        b = FakeBroker()
+        self._oto_buy(b)
+        assert len(b.get_positions()) == 1
+        stops = [o for o in b.get_orders(open_only=True) if o.is_protective_stop]
+        assert len(stops) == 1
+        assert stops[0].tif == "gtc" and stops[0].stop_price == 600.0
+
+    def test_kill_leaves_protective_stop(self):
+        from lab.controls import kill_switch
+        b = FakeBroker()
+        self._oto_buy(b)
+        kill_switch(b)                       # cancels entries only
+        stops = [o for o in b.get_orders(open_only=True) if o.is_protective_stop]
+        assert len(stops) == 1               # stop survives the kill switch
+
+    def test_close_position_cancels_stop_then_sells(self):
+        from lab.controls import close_position
+        b = FakeBroker()
+        self._oto_buy(b)
+        assert close_position(b, "SPY") is True
+        assert b.get_positions() == []
+        assert b.get_orders(open_only=True) == []   # stop cancelled, position sold
+
+    def test_close_everything_flattens(self):
+        from lab.controls import close_everything
+        b = FakeBroker()
+        self._oto_buy(b)
+        close_everything(b, confirm=True)
+        assert b.get_positions() == []
+        assert b.get_orders(open_only=True) == []
+
+    def test_ensure_stops_replaces_missing_and_alerts(self, tmp_path):
+        from lab.controls import ensure_stops
+        conn = _db(tmp_path)
+        b = FakeBroker()
+        b.connect()
+        b._add_position("SPY", 1, 600.0)     # a position with NO protective stop
+        replaced = ensure_stops(b, conn)
+        assert replaced == ["SPY"]
+        stops = [o for o in b.get_orders(open_only=True) if o.is_protective_stop]
+        assert len(stops) == 1 and stops[0].tif == "gtc"
+        alerts = conn.execute(
+            "SELECT COUNT(*) c FROM system_events WHERE event_type='ALERT'"
+        ).fetchone()["c"]
+        assert alerts == 1
+
+    def test_cancel_unfilled_entries(self):
+        from lab.controls import cancel_unfilled_entries
+        b = FakeBroker()
+        b.connect()
+        b._add_order("SPY", 1, side="buy", status="new", oid="e1")
+        assert cancel_unfilled_entries(b) == 1
 
 
 class TestBannerAndFactory:

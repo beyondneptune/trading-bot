@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# One-word emergency controls for the lab. (Named 'labctl' because a file named
+# 'lab' would collide with the lab/ package directory.)
+#
+#   ./labctl status
+#   ./labctl kill
+#   ./labctl hard-stop on
+#   ./labctl hard-stop off
+#   ./labctl close-everything --confirm
+set -euo pipefail
+cd "$(dirname "$0")"
+TRADING_BACKEND=alpaca PYTHONPATH=. .venv311/bin/python ops/lab_control.py "$@"

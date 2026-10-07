@@ -139,6 +139,19 @@ class AlpacaBroker(Broker):
             ))
         return out
 
+    @staticmethod
+    def _map_order(o) -> BrokerOrder:
+        return BrokerOrder(
+            id=str(o.id), client_order_id=str(o.client_order_id),
+            symbol=str(o.symbol), qty=_f(o.qty),
+            side=str(o.side).lower().replace("orderside.", ""),
+            order_type=str(getattr(o, "order_type", getattr(o, "type", ""))).lower().replace("ordertype.", ""),
+            status=str(o.status).lower().replace("orderstatus.", ""),
+            limit_price=_f(o.limit_price) if o.limit_price else None,
+            stop_price=_f(o.stop_price) if o.stop_price else None,
+            tif=str(getattr(o, "time_in_force", "")).lower().replace("timeinforce.", ""),
+        )
+
     def get_orders(self, open_only: bool = True) -> list[BrokerOrder]:
         client = self._require()
         from alpaca.trading.requests import GetOrdersRequest
@@ -146,20 +159,64 @@ class AlpacaBroker(Broker):
         req = GetOrdersRequest(
             status=QueryOrderStatus.OPEN if open_only else QueryOrderStatus.ALL
         )
-        out = []
-        for o in client.get_orders(req):
-            out.append(BrokerOrder(
-                id=str(o.id), client_order_id=str(o.client_order_id),
-                symbol=str(o.symbol), qty=_f(o.qty),
-                side=str(o.side).lower().replace("orderside.", ""),
-                order_type=str(getattr(o, "order_type", getattr(o, "type", ""))).lower(),
-                status=str(o.status).lower().replace("orderstatus.", ""),
-                limit_price=_f(o.limit_price) if o.limit_price else None,
-                stop_price=_f(o.stop_price) if o.stop_price else None,
-            ))
-        return out
+        return [self._map_order(o) for o in client.get_orders(req)]
+
+    def get_last_price(self, symbol: str) -> float:
+        """Latest trade price from the IEX feed (free plan)."""
+        from alpaca.data.historical import StockHistoricalDataClient
+        from alpaca.data.requests import StockLatestTradeRequest
+        dc = StockHistoricalDataClient(
+            os.getenv("ALPACA_API_KEY_ID"), os.getenv("ALPACA_API_SECRET_KEY")
+        )
+        req = StockLatestTradeRequest(symbol_or_symbols=symbol, feed="iex")
+        trade = dc.get_stock_latest_trade(req)
+        return _f(trade[symbol].price)
+
+    # ------------------------------------------------------------- order submission
+    def submit_order(self, *, symbol, qty, side, asset_class="us_equity",
+                     order_type="market", limit_price=None, stop_price=None,
+                     order_class=None, tif="gtc", client_order_id=None, **kwargs):
+        from broker.base import OptionsNotAllowedError, is_option_symbol
+        if asset_class in ("option", "us_option") or is_option_symbol(symbol):
+            raise OptionsNotAllowedError(
+                f"Options order blocked at broker: {symbol}. No options trading "
+                "until S6 is approved in writing."
+            )
+        client = self._require()
+        from alpaca.trading.requests import (
+            LimitOrderRequest, MarketOrderRequest, StopLossRequest,
+        )
+        from alpaca.trading.enums import OrderClass, OrderSide, TimeInForce
+        side_enum = OrderSide.BUY if side == "buy" else OrderSide.SELL
+        tif_enum = TimeInForce.GTC if str(tif).lower() == "gtc" else TimeInForce.DAY
+        oclass = OrderClass.OTO if order_class == "oto" else OrderClass.SIMPLE
+        stop_loss = (StopLossRequest(stop_price=stop_price)
+                     if (order_class == "oto" and stop_price) else None)
+        common = dict(symbol=symbol, qty=qty, side=side_enum,
+                      time_in_force=tif_enum, order_class=oclass,
+                      client_order_id=client_order_id, stop_loss=stop_loss)
+        if order_type == "limit":
+            req = LimitOrderRequest(limit_price=limit_price, **common)
+        elif order_type == "stop":
+            from alpaca.trading.requests import StopOrderRequest
+            req = StopOrderRequest(stop_price=stop_price, **common)
+        else:
+            req = MarketOrderRequest(**common)
+        return self._map_order(client.submit_order(order_data=req))
 
     # ------------------------------------------------------------- controls
+    def cancel_order(self, order_id: str) -> None:
+        self._require().cancel_order_by_id(order_id)
+
+    def cancel_entry_orders(self) -> int:
+        """Cancel open ENTRY (buy) orders only; leave protective sell-stops."""
+        n = 0
+        for o in self.get_orders(open_only=True):
+            if o.side == "buy" and not o.is_protective_stop:
+                self.cancel_order(o.id)
+                n += 1
+        return n
+
     def cancel_all_orders(self) -> int:
         client = self._require()
         resp = client.cancel_orders()
