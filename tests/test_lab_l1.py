@@ -45,7 +45,7 @@ class TestFakeBroker:
         acct = b.set_safe_account_config()
         assert acct.shorting_enabled is False
         assert acct.multiplier == "1"
-        assert acct.options_level == 1
+        assert acct.options_level == 3   # options level left unchanged (hard-blocked instead)
 
     def test_hard_stop_toggles(self):
         b = FakeBroker()
@@ -130,6 +130,53 @@ class TestOptionsLevelMonitor:
             "SELECT COUNT(*) c FROM system_events WHERE event_type='ALERT'"
         ).fetchone()["c"]
         assert alerts == 1
+
+
+class TestStream:
+    def test_handle_trade_update_records_fill(self, tmp_path):
+        from lab.stream import handle_trade_update
+        conn = _db(tmp_path)
+        event = {
+            "event": "fill",
+            "order": {
+                "id": "o1", "client_order_id": "S4-c1", "symbol": "SPY",
+                "qty": 1, "filled_qty": 1, "filled_avg_price": 500.25,
+                "status": "filled", "side": "buy",
+            },
+        }
+        handle_trade_update(conn, event)
+        row = conn.execute(
+            "SELECT event, symbol, filled_avg_price, side, status "
+            "FROM trade_updates"
+        ).fetchone()
+        assert row["event"] == "fill"
+        assert row["symbol"] == "SPY"
+        assert abs(row["filled_avg_price"] - 500.25) < 1e-9
+        assert row["side"] == "buy" and row["status"] == "filled"
+
+
+class TestStartupSequence:
+    def test_startup_checks_lock_config_and_reconcile(self, tmp_path):
+        from lab.run_lab import startup_checks
+        conn = _db(tmp_path)
+        b = FakeBroker(shorting_enabled=True, multiplier="2", options_level=3)
+        acct = startup_checks(b, conn, "paper", "lab_paper_test.db")
+        assert acct.shorting_enabled is False      # locked
+        assert acct.multiplier == "1"              # no margin
+        # options level recorded
+        row = conn.execute(
+            "SELECT value FROM db_meta WHERE key='alpaca_options_level'"
+        ).fetchone()
+        assert row["value"] == "3"
+
+    def test_startup_warns_on_hard_stop(self, tmp_path, caplog):
+        import logging
+        from lab.run_lab import startup_checks
+        conn = _db(tmp_path)
+        b = FakeBroker(suspended=True)
+        with caplog.at_level(logging.WARNING):
+            startup_checks(b, conn, "paper", "lab_paper_test.db")
+        assert any("HARD STOP" in r.message for r in caplog.records)
 
 
 class TestBannerAndFactory:

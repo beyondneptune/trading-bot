@@ -41,9 +41,10 @@ class FakeBroker(Broker):
         return self._acct
 
     def set_safe_account_config(self) -> BrokerAccount:
+        # Only no-short / no-margin are set; options level is left as-is
+        # (Alpaca won't lower it; options orders are hard-blocked instead).
         self._acct.shorting_enabled = False
         self._acct.multiplier = "1"
-        self._acct.options_level = 1
         return self._acct
 
     def set_trade_suspended(self, suspended: bool) -> None:

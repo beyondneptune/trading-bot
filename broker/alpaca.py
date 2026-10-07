@@ -180,7 +180,7 @@ class AlpacaBroker(Broker):
         stream = TradingStream(key, secret, paper=True)
 
         async def _handler(data):
-            on_update(data if isinstance(data, dict) else {"event": str(getattr(data, "event", "")), "raw": data})
+            on_update(data)   # pass the raw TradeUpdate through to the recorder
 
         stream.subscribe_trade_updates(_handler)
         return stream

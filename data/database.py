@@ -267,6 +267,23 @@ CREATE TABLE IF NOT EXISTS db_meta (
     key         TEXT PRIMARY KEY,
     value       TEXT NOT NULL
 );
+
+-- Raw broker trade-update stream (fills, acks, cancels). The broker is the
+-- source of truth; this is the local record of everything it tells us.
+CREATE TABLE IF NOT EXISTS trade_updates (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    event            TEXT NOT NULL,
+    order_id         TEXT,
+    client_order_id  TEXT,
+    symbol           TEXT,
+    qty              REAL,
+    filled_qty       REAL,
+    filled_avg_price REAL,
+    status           TEXT,
+    side             TEXT,
+    received_at      TEXT NOT NULL,
+    raw              TEXT
+);
 """
 
 
